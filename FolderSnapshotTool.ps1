@@ -5,22 +5,22 @@ param (
     [string]$Old = ""
 )
 
-# [object[]]$Paths = @(
-	# @("C:\","Windows","Users","Program Files","Program Files (x86)","ProgramData"),
-	# @("C:\Windows\",""),
-	# @("C:\Program Files\",""),
-	# @("C:\Program Files (x86)\",""),
-	# @("C:\ProgramData\",""),
-	# @(($env:USERPROFILE),"AppData"),
-	# @((Join-Path $env:USERPROFILE "AppData\Local\"),""),
-	# @((Join-Path $env:USERPROFILE "AppData\LocalLow\"),""),
-	# @((Join-Path $env:USERPROFILE "AppData\Roaming\"),"")
-# )
-
 [object[]]$Paths = @(
-	@("E:\python-proj\","ssssss"),
-	@("")
+	@("C:\","Windows","Users","Program Files","Program Files (x86)","ProgramData"),
+	@("C:\Windows\",""),
+	@("C:\Program Files\",""),
+	@("C:\Program Files (x86)\",""),
+	@("C:\ProgramData\",""),
+	@(($env:USERPROFILE),"AppData"),
+	@((Join-Path $env:USERPROFILE "AppData\Local\"),""),
+	@((Join-Path $env:USERPROFILE "AppData\LocalLow\"),""),
+	@((Join-Path $env:USERPROFILE "AppData\Roaming\"),"")
 )
+
+# [object[]]$Paths = @(
+	# @("E:\python-proj\","ssssss"),
+	# @("")
+# )
 
 # Write-Host (Split-Path -Path $env:USERPROFILE -Leaf)
 # Write-Host (Join-Path $env:USERPROFILE "AppData\")
