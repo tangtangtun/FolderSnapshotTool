@@ -2,20 +2,26 @@
 
 param (
     [Parameter(Mandatory=$false)]
-    [string]$OldFile = ""
+    [string]$Old = ""
 )
 
+# [object[]]$Paths = @(
+	# @("C:\","Windows","Users","Program Files","Program Files (x86)","ProgramData"),
+	# @("C:\Windows\",""),
+	# @("C:\Program Files\",""),
+	# @("C:\Program Files (x86)\",""),
+	# @("C:\ProgramData\",""),
+	# @(($env:USERPROFILE),"AppData"),
+	# @((Join-Path $env:USERPROFILE "AppData\Local\"),""),
+	# @((Join-Path $env:USERPROFILE "AppData\LocalLow\"),""),
+	# @((Join-Path $env:USERPROFILE "AppData\Roaming\"),"")
+# )
+
 [object[]]$Paths = @(
-	@("C:\","Windows","Users","Program Files","Program Files (x86)","ProgramData"),
-	@("C:\Windows\",""),
-	@("C:\Program Files\",""),
-	@("C:\Program Files (x86)\",""),
-	@("C:\ProgramData\",""),
-	@(($env:USERPROFILE),"AppData"),
-	@((Join-Path $env:USERPROFILE "AppData\Local\"),""),
-	@((Join-Path $env:USERPROFILE "AppData\LocalLow\"),""),
-	@((Join-Path $env:USERPROFILE "AppData\Roaming\"),"")
+	@("E:\python-proj\","ssssss"),
+	@("")
 )
+
 # Write-Host (Split-Path -Path $env:USERPROFILE -Leaf)
 # Write-Host (Join-Path $env:USERPROFILE "AppData\")
 function Take-Snapshot {
@@ -24,7 +30,7 @@ function Take-Snapshot {
     # foreach ($base in $TargetPaths) {
 	for ($i = 0; $i -lt $Paths.Count; $i++) {
 		$base = $Paths[$i][0]
-        if (-not (Test-Path $base)) {
+        if ( [string]::IsNullOrWhiteSpace($base) -or -not (Test-Path $base)) {
             Write-Warning "路径不存在: $base"
             continue
         }
@@ -63,17 +69,21 @@ function Compare-Snapshot {
         [object[]]$NewData
     )
 
-    $old = Import-Csv $OldFile | Group-Object Folder -AsHashTable -AsString
-    $result = @()
-
+    $oldinfo = Import-Csv $Old | Group-Object Folder -AsHashTable -AsString
+		
+	$changed = @()
+	$added = @()
+	$removed = @()
+    
+    # 遍历新数据：找出修改和新增
     foreach ($entry in $NewData) {
         $folder = $entry.Folder
         $newSize = [double]$entry.SizeMB
         $newCount = [int]$entry.FileCount
         $newMod = $entry.LastModified
 
-        if ($old.ContainsKey($folder)) {
-            $oldEntry = $old[$folder]
+        if ($oldinfo.ContainsKey($folder)) {
+            $oldEntry = $oldinfo[$folder]
             $oldSize = [double]$oldEntry.SizeMB
             $oldCount = [int]$oldEntry.FileCount
 
@@ -81,21 +91,43 @@ function Compare-Snapshot {
             $deltaCount = $newCount - $oldCount
 
             if ($deltaSize -ne 0 -or $deltaCount -ne 0) {
-                $result += [PSCustomObject]@{
+                $changed += [PSCustomObject]@{
                     Folder        = $folder
                     OldSizeMB     = $oldSize
-                    NewSizeMB     = $newSize
-                    DeltaMB       = $deltaSize
+                    SizeMB     = $newSize
                     OldFileCount  = $oldCount
-                    NewFileCount  = $newCount
-                    DeltaFiles    = $deltaCount
+                    FileCount  = $newCount
                     LastModified  = $newMod
                 }
+            }
+            # 已对比过的目录移除，剩下的就是删除的
+            $oldinfo.Remove($folder)
+        } else {
+            # 新增目录
+            $added += [PSCustomObject]@{
+                Folder       = $folder
+                SizeMB    = $newSize
+                FileCount = $newCount
+                LastModified = $newMod
             }
         }
     }
 
-    return $result
+    # 剩下在 $old 中的就是已被删除的目录
+    foreach ($entry in $oldinfo.Values) {
+        $removed += [PSCustomObject]@{
+            Folder       = $entry.Folder
+            OldSizeMB    = [double]$entry.SizeMB
+            OldFileCount = [int]$entry.FileCount
+        }
+    }
+	
+	# 最终返回包含所有结果的对象
+    return [PSCustomObject]@{
+        Changed = $changed
+        Added   = $added
+        Removed = $removed
+    }
 }
 
 # ===== Main Logic =====
@@ -123,20 +155,38 @@ for ($i = 0; $i -lt $Paths.Count; $i++) {
 $data = Take-Snapshot
 
 # 快照模式（默认）
-if (-not $OldFile) {
+if (-not $Old) {
 	$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 	$OutFile = ".\snapshot-$timestamp.csv"
 
     $data | Export-Csv -Path $OutFile -NoTypeInformation -Encoding UTF8
-    Write-Host "? 快照已保存到 $OutFile" -ForegroundColor Green
+	Write-Host ""
+    Write-Host " 快照已保存到 $OutFile" -ForegroundColor Green
+	Write-Host ""
 }
 else {
-    Write-Host "?? 正在比较快照文件：$Snapshot ..." -ForegroundColor Yellow
-    $diff = Compare-Snapshot -NewData $data
-    if ($diff.Count -eq 0) {
-        Write-Host "? 没有发现变动。" -ForegroundColor Green
-    }
-    else {
-        $diff | Sort-Object DeltaMB -Descending | Format-Table -AutoSize
-    }
+	Write-Host ""
+    Write-Host "与快照文件：$Old 比较..." -ForegroundColor Yellow
+    $result = Compare-Snapshot -NewData $data
+    
+	# 输出改动的
+	Write-Host ""
+	Write-Host ""
+	Write-Host "改动数量: $($result.Changed.Count)"
+	$result.Changed | Format-Table -AutoSize
+	Write-Host ""
+
+	# 输出新增目录
+	Write-Host ""
+	Write-Host ""
+	Write-Host "新增数量: $($result.Added.Count)"
+	$result.Added | Format-Table -AutoSize
+	Write-Host ""
+
+	# 输出删除的目录
+	Write-Host ""
+	Write-Host ""
+	Write-Host "删除数量: $($result.Removed.Count)"
+	$result.Removed | Format-Table -AutoSize
+	Write-Host ""
 }
