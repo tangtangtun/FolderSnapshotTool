@@ -14,11 +14,11 @@ Currently running on windows+powershell
 @("C:\Program Files\",""),  
 @("C:\Program Files (x86)\",""),  
 @("C:\ProgramData\",""),  
-@(($env:USERPROFILE),"AppData"),  
+@(($env:USERPROFILE),"AppData"),
 @((Join-Path $env:USERPROFILE "AppData\Local\"),""),  
 @((Join-Path $env:USERPROFILE "AppData\LocalLow\"),""),  
 @((Join-Path $env:USERPROFILE "AppData\Roaming\"),"")  
-)
+)  
 Record the directories to be captured and excluded directories. Note: only the first-level subdirectories of the directory are captured
 
 # Operation steps:
